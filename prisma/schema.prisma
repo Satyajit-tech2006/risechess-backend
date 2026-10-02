@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  COACH
+  STUDENT
+}
+
+enum Permission {
+  TAKE_CLASS
+  MANAGE_STUDENTS
+  MANAGE_BATCHES
+  CREATE_ASSIGNMENTS
+  EVALUATE_ASSIGNMENTS
+  MANAGE_PGN
+  VIEW_REPORTS
+  VIEW_FEES
+}
+
+model Academy {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  users     User[]
+  tags      Tag[]
+  batches   Batch[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("academies")
+}
+
+model User {
+  id           String         @id @default(uuid()) @db.Uuid
+  academyId    String         @map("academy_id") @db.Uuid
+  academy      Academy        @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  username     String
+  firstName    String         @map("first_name")
+  lastName     String?        @map("last_name")
+  email        String?
+  passwordHash String         @map("password_hash")
+
+  role         Role           @default(STUDENT)
+  permissions  Permission[]   @default([])
+
+  contactNo    String?        @map("contact_no")
+  dob          DateTime?      @db.Date
+  gender       String?        @default("Not specified")
+  classesLeft  Int            @default(0) @map("classes_left")
+  status       String         @default("ACTIVE")
+  classLogs    ClassLog[]
+  tags         UserTag[]
+  batches      BatchStudent[]
+  coachedBatches Batch[]      @relation("CoachBatches")
+
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  @@unique([academyId, username])
+  @@unique([academyId, email])
+  @@index([academyId, role])
+  @@map("users")
+}
+
+model Tag {
+  id        String    @id @default(uuid()) @db.Uuid
+  academyId String    @map("academy_id") @db.Uuid
+  academy   Academy   @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  name      String
+  users     UserTag[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([academyId, name])
+  @@map("tags")
+}
+
+model UserTag {
+  userId    String   @map("user_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([userId, tagId])
+  @@map("user_tags")
+}
+
+model Batch {
+  id        String         @id @default(uuid()) @db.Uuid
+  academyId String         @map("academy_id") @db.Uuid
+  academy   Academy        @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  name      String
+  coachId   String         @map("coach_id") @db.Uuid
+  coach     User           @relation("CoachBatches", fields: [coachId], references: [id], onDelete: Restrict)
+  students  BatchStudent[]
+
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  @@unique([academyId, name])
+  @@map("batches")
+}
+
+model BatchStudent {
+  batchId   String   @map("batch_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([batchId, studentId])
+  @@map("batch_students")
+}
+
+enum LogType {
+  CREDIT_ADDED
+  CLASS_ATTENDED
+  CLASS_MISSED
+  MANUAL_ADJUSTMENT
+}
+
+model ClassLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  change      Int      // +5 (added credits) or -1 (attended class)
+  type        LogType
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("class_logs")
+}
