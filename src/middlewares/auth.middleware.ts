@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Role, Permission } from '@prisma/client';
 
 export interface AuthUserPayload {
+  id: string;
   userId: string;
   academyId: string;
   role: Role;
@@ -35,9 +36,18 @@ export const authenticate = (
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET || 'dev-secret-key'
-    ) as AuthUserPayload;
+    ) as any;
 
-    req.user = decoded;
+    const resolvedId = decoded.id || decoded.userId || decoded.sub;
+
+    req.user = {
+      id: resolvedId,
+      userId: resolvedId,
+      academyId: decoded.academyId,
+      role: decoded.role,
+      permissions: decoded.permissions || [],
+    };
+
     next();
   } catch (error) {
     res.status(401).json({ status: 'error', message: 'Invalid or expired token' });
